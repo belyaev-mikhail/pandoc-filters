@@ -15,6 +15,9 @@ import Control.Monad.IO.Class
 
 stripHeader (Pandoc _ blocks) = blocks
 
+adjustHeader adjust (Header level attrs contents) = Header (level + adjust) attrs contents
+adjustHeader _ b = b
+
 concatMapIO :: (a -> PandocIO [a]) -> [a] -> PandocIO [a]
 concatMapIO f lst = concat <$> mapM f lst
 
@@ -35,7 +38,10 @@ doInclude cb@(CodeBlock (id, classes, namevals) contents) =
                     blocks <- forM (lines contents) $ \f ->
                         do  
                             md <- readMD f
-                            bottomUpM (concatMapIO doInclude) md
+                            full <- bottomUpM (concatMapIO doInclude) md
+                            case lookup "leveloffset" namevals of
+                                 Just offset -> return $ bottomUp (adjustHeader $ read offset) full
+                                 Nothing -> return full
                     return $ concat blocks
         else return [cb]
 doInclude x = return [x]
