@@ -79,21 +79,25 @@ readFormat fmt fname = do
                                         readWith readerSig fname
                                 else return []
 
+getFormat namevals filename = 
+    case lookup "format" namevals of
+         Just format -> format
+         Nothing -> defaultReaderName "markdown" filename
+applyOffset namevals document =
+    case lookup "leveloffset" namevals of
+         Just offset -> bottomUp (adjustHeader $ read offset) document
+         Nothing -> document
+
 doInclude :: Block -> PandocIO [Block]
 doInclude cb@(CodeBlock (id, classes, namevals) contents) =
     if "include" `elem` classes
         then do 
                     blocks <- forM (lines contents) $ \f ->
                         do  
-                            let fmt = 
-                                        case lookup "format" namevals of
-                                             Just format -> format
-                                             Nothing -> defaultReaderName "markdown" f 
+                            let fmt = getFormat namevals f
                             included <- readFormat fmt f
                             full <- bottomUpM (concatMapIO doInclude) included
-                            case lookup "leveloffset" namevals of
-                                 Just offset -> return $ bottomUp (adjustHeader $ read offset) full
-                                 Nothing -> return full
+                            return $ applyOffset namevals full
                     return $ concat blocks
         else return [cb]
 doInclude x = return [x]
